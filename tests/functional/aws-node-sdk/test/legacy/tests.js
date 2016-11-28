@@ -24,7 +24,7 @@ const objectKey = 'toAbort&<>"\'';
 // same uploadId
 const multipartUploadData = {};
 
-    describe.only('aws-node-sdk test suite as registered user', function testSuite() {
+describe('aws-node-sdk test suite as registered user', function testSuite() {
     this.timeout(60000);
     let s3;
 
