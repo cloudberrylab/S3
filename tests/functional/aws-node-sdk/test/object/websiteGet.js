@@ -1,22 +1,68 @@
-const zombie = require('zombie');
+const http = require('http');
+const assert = require('assert');
 
-zombie.localhost('bucketwebsitetester.s3-website-us-east-1.amazonaws.com',
-    8000);
-// this will redirect any given host to localhost
+const Browser = require('zombie');
 
-// need to handle ci endpoint `${transport}://${process.env.IP}:8000` like
-// regular testing is being done but need website endpoint env variable that
-// is also in config as website endpoint.
+require('babel-core/register');
+const conf = require('../../../../../lib/Config').default;
+const transport = conf.https ? 'https' : 'http';
+const hostname = 'bucketwebsitetester.s3-website-us-east-1.amazonaws.com';
 
+const endpoint = `${transport}://${hostname}:8000`;
 
-zombie.visit('/path', function () {
-    console.log(zombie.location.href);
+// TODO: Add this endpoint in Integration for CI
+// TODO: Note in Docs that for testing need to add line to local etc/hosts:
+// 127.0.0.1 bucketwebsitetester.s3-website-us-east-1.amazonaws.com
+
+describe('User visits bucket website endpoint', () => {
+    const browser = new Browser();
+
+    it('should return 405 when user requests method other than get or head',
+        done => {
+            const options = {
+                hostname,
+                port: 8000,
+                method: 'POST',
+            };
+            const req = http.request(options, res => {
+                const body = [];
+                res.on('data', chunk => {
+                    body.push(chunk);
+                });
+                res.on('end', () => {
+                    assert.strictEqual(res.statusCode, 405);
+                    const total = body.join('');
+                    assert(total.indexOf('<head><title>405 ' +
+                        'Method Not Allowed</title></head>') > -1);
+                    done();
+                });
+            });
+            req.end();
+        });
+
+    it('should return 404 when no such bucket', done => {
+        browser.visit(endpoint, () => {
+            browser.assert.status(404);
+            browser.assert.text('title', '404 Not Found');
+            browser.assert.text('h1', '404 Not Found');
+            browser.assert.element('#code');
+            browser.assert.text('#code', 'Code: NoSuchBucket');
+            browser.assert.text('#message',
+                'Message: The specified bucket does not exist.');
+            done();
+        });
+    });
+
+    describe('with existing bucket', () => {
+        before
+    })
 });
 
 // Tests:
-// 1) website endpoint method other than get or head
-// 2) website endpoint without a bucket name
-// 3) no such
+// 1) website endpoint method other than get or head X
+// 2) website endpoint without a bucket name (would need separate etc/hosts
+// entry -- SKIP it)
+// 3) no such bucket X
 // 4) no website configuration
 // 5) no key in request -- uses index document
 // 6) path in request without key -- uses index document
